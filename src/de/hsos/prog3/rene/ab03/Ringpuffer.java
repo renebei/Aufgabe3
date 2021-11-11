@@ -24,15 +24,14 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
     }
 
 
-
     @Override
     public int size() {
-        return elements.size();
+        return this.size;
     }
 
     @Override
     public boolean isEmpty() {
-        return elements.isEmpty();
+        return size == 0;
     }
 
     @Override
@@ -57,17 +56,31 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public boolean add(T t) {
-        return false;
+        if (size() == capacity) {
+            //if (!discarding) return false;
+            readPos = incrementPos(readPos);
+        }
+        elements.add(writePos, t);
+        writePos = incrementPos(writePos);
+        return true;
+    }
+
+    private int incrementPos(int pos) {
+        return pos = (pos + 1) % this.capacity;
     }
 
     @Override
     public boolean remove(Object o) {
-        return false;
+        if (!elements.contains(o)) return false;
+        readPos = incrementPos(readPos);
+        return true;
     }
 
     @Override
     public boolean containsAll(Collection<?> c) {
-        return false;
+        for (T t : elements) if (!c.contains(t)) return false;
+
+        return true;
     }
 
     @Override
@@ -87,7 +100,6 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public void clear() {
-
     }
 
     @Override
@@ -112,6 +124,7 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public T peek() {
-        return null;
+        if (elements.get(0) != null) return elements.get(0);
+        else return null;
     }
 }
