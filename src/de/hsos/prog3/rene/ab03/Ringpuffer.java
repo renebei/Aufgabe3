@@ -16,6 +16,14 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
     private boolean fixedCapacity;
     private boolean discarding;
 
+
+    public Ringpuffer(int capacity) {
+        this.elements = new ArrayList<>();
+        this.capacity = capacity;
+        this.fixedCapacity = true;
+        this.discarding = true;
+    }
+
     public Ringpuffer(int capacity, boolean fixed, boolean discard) {
         this.elements = new ArrayList<>();
         this.capacity = capacity;
@@ -36,12 +44,26 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public boolean contains(Object t) {
-        return elements.contains(t);
+        for (T element : elements) {
+            if (element.equals(t)) return true;
+        }
+        return false;
     }
 
     @Override
     public Iterator<T> iterator() {
-        return null;
+        Iterator<T> it = new Iterator<T>() {
+            @Override
+            public boolean hasNext() {
+                return (elements.get(readPos + 1)) != null;
+            }
+
+            @Override
+            public T next() {
+                return ((elements.get(incrementPos(readPos)) != null) ? elements.get(incrementPos(readPos)) : null);
+            }
+        };
+        return it;
     }
 
     @Override
@@ -62,17 +84,19 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
         }
         elements.add(writePos, t);
         writePos = incrementPos(writePos);
+        if (size < capacity) this.size++;
         return true;
     }
 
     private int incrementPos(int pos) {
-        return pos = (pos + 1) % this.capacity;
+        return (pos + 1) % this.capacity;
     }
 
     @Override
     public boolean remove(Object o) {
         if (!elements.contains(o)) return false;
         readPos = incrementPos(readPos);
+        this.size--;
         return true;
     }
 
@@ -109,7 +133,10 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public T remove() {
-        return null;
+        T t = elements.get(readPos);
+        readPos = incrementPos(readPos);
+        this.size--;
+        return t;
     }
 
     @Override
