@@ -9,26 +9,37 @@ import java.util.Queue;
 public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     private ArrayList<T> elements;
-    private int writePos;
-    private int readPos;
+    private int writePos = 0;
+    private int readPos = 0;
     private int size;
     private int capacity;
     private boolean fixedCapacity;
     private boolean discarding;
+    private final int CAPACITY_EXPANSION;
 
 
-    public Ringpuffer(int capacity) {
-        this.elements = new ArrayList<>();
+    public Ringpuffer(int capacity, int parameter) {
+        this.elements = new ArrayList<>(capacity);
         this.capacity = capacity;
         this.fixedCapacity = true;
         this.discarding = true;
+        this.CAPACITY_EXPANSION = parameter;
     }
 
-    public Ringpuffer(int capacity, boolean fixed, boolean discard) {
+    public Ringpuffer(int capacity, boolean fixed, boolean discard, int parameter) {
         this.elements = new ArrayList<>();
         this.capacity = capacity;
         this.fixedCapacity = fixed;
         this.discarding = discard;
+        this.CAPACITY_EXPANSION = parameter;
+        fill();
+    }
+
+
+    private void fill() {
+        for (int i = 0; i < capacity; i++) {
+            elements.add(null);
+        }
     }
 
 
@@ -44,8 +55,8 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public boolean contains(Object t) {
-        for (T element : elements) {
-            if (element.equals(t)) return true;
+        for (T tt : this) {
+            if (tt.equals(t)) return true;
         }
         return false;
     }
@@ -53,14 +64,23 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
     @Override
     public Iterator<T> iterator() {
         Iterator<T> it = new Iterator<T>() {
+            private int count = 0;
+
             @Override
             public boolean hasNext() {
-                return (elements.get(readPos + 1)) != null;
+                if (size == capacity) return count < capacity;
+                else return count < size;
             }
 
             @Override
             public T next() {
-                return ((elements.get(incrementPos(readPos)) != null) ? elements.get(incrementPos(readPos)) : null);
+                if (readPos <= size) {
+                    T temp = elements.get(readPos);
+                    readPos = incrementPos(readPos);
+                    count++;
+                    return temp;
+                }
+                return null;
             }
         };
         return it;
@@ -68,7 +88,12 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public Object[] toArray() {
-        return elements.toArray();
+        T[] arr = (T[]) new Object[size];
+        int count = 0;
+        for (T t : this) {
+            arr[count++] = t;
+        }
+        return arr;
     }
 
     @Override
@@ -79,55 +104,105 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
     @Override
     public boolean add(T t) {
         if (size() == capacity) {
-            //if (!discarding) return false;
-            readPos = incrementPos(readPos);
+            return testInsertionRules(t);
         }
         elements.add(writePos, t);
         writePos = incrementPos(writePos);
-        if (size < capacity) this.size++;
+        this.size++;
         return true;
+    }
+
+    @Override
+    public boolean remove(Object o) {
+        if (this.contains(o)) {
+            readPos = incrementPos(readPos);
+            size--;
+            return true;
+        }
+        return false;
     }
 
     private int incrementPos(int pos) {
         return (pos + 1) % this.capacity;
     }
 
-    @Override
-    public boolean remove(Object o) {
-        if (!elements.contains(o)) return false;
-        readPos = incrementPos(readPos);
-        this.size--;
-        return true;
-    }
 
-    @Override
+    @Override //
     public boolean containsAll(Collection<?> c) {
-        for (T t : elements) if (!c.contains(t)) return false;
+        if (c.size() > this.size) return false;
+        else {
+            for (T t : this) {
+                if (!c.contains(t)) return false;
+            }
+            return true;
+        }
 
-        return true;
     }
 
     @Override
     public boolean addAll(Collection<? extends T> c) {
-        return false;
+        if (c != null) {
+            for (T t : c) {
+                add(t);
+            }
+        }
+        return true;
     }
 
     @Override
     public boolean removeAll(Collection<?> c) {
-        return false;
+        try {
+            T[] t = (T[]) c.toArray();
+            for (int i = 0; i < capacity; i++) {
+                this.remove(t[i]);
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override
     public boolean retainAll(Collection<?> c) {
-        return false;
+        boolean changed = false;
+        for (T t : this) {
+            if (!c.contains(t)) {
+                this.remove(t);
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     @Override
     public void clear() {
+        elements = new ArrayList<>();
+        size = 0;
+        readPos = 0;
+        writePos = 0;
     }
 
     @Override
     public boolean offer(T t) {
+        return testInsertionRules(t);
+    }
+
+    private boolean testInsertionRules(T t) {
+        if (discarding) {
+            elements.set(writePos, t);
+            writePos = incrementPos(writePos);
+            readPos = incrementPos(readPos);
+            return true;
+        } else {
+            if (!fixedCapacity) {
+                this.capacity += CAPACITY_EXPANSION;
+                elements.add(writePos, t);
+                writePos = incrementPos(writePos);
+                readPos = incrementPos(readPos);
+                this.size++;
+                return true;
+            }
+        }
         return false;
     }
 
@@ -141,17 +216,24 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public T poll() {
-        return null;
+        if (elements.isEmpty()) return null;
+        T t = elements.get(readPos);
+        readPos = incrementPos(readPos);
+        this.size--;
+        return t;
     }
 
     @Override
     public T element() {
-        return null;
+        return elements.get(writePos - 1);
     }
 
     @Override
     public T peek() {
-        if (elements.get(0) != null) return elements.get(0);
-        else return null;
+        try {
+            return elements.get(writePos - 1);
+        } catch (IndexOutOfBoundsException e) {
+            return null;
+        }
     }
 }
