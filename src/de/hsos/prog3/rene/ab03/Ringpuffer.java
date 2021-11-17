@@ -15,15 +15,6 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
     private boolean discarding;
     private final int CAPACITY_EXPANSION;
 
-
-    public Ringpuffer(int capacity, int parameter) {
-        this.elements = new ArrayList<>();
-        this.capacity = capacity;
-        this.fixedCapacity = true;
-        this.discarding = true;
-        this.CAPACITY_EXPANSION = parameter;
-    }
-
     public Ringpuffer(int capacity, boolean fixed, boolean discard, int parameter) {
         this.elements = new ArrayList<>();
         for (int i = 0; i < capacity; i++) {
@@ -34,6 +25,7 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
         this.discarding = discard;
         this.CAPACITY_EXPANSION = parameter;
     }
+
 
     @Override
     public int size() {
@@ -51,6 +43,18 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
             if (tt.equals(t)) return true;
         }
         return false;
+    }
+
+
+    @Override
+    public Ringpuffer<T> clone() {
+        try {
+            Ringpuffer clone = (Ringpuffer) super.clone();
+            clone.elements = new ArrayList<>(elements);
+            return clone;
+        } catch (CloneNotSupportedException e) {
+            throw new AssertionError("Clone wasnt supported"); //https://stackoverflow.com/questions/24863185/what-is-an-assertionerror-in-which-case-should-i-throw-it-from-my-own-code
+        }
     }
 
     @Override
@@ -77,8 +81,13 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public T[] toArray() {
-        return (T[]) elements.toArray();
-    } //cheat
+        T[] array = (T[]) Array.newInstance(this.getClass().getComponentType(), size);
+        int i = 0;
+        for (T t : this) {
+            array[i++] = t;
+        }
+        return array;
+    }
 
     @Override
     public <T1> T1[] toArray(T1[] a) {
@@ -101,17 +110,14 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
         if (size() == capacity) {
             if (fixedCapacity) {
                 if (discarding) {
-                    removeRing();
+                    removeFromRing();
                 } else {
                     return false;
                 }
             } else {
-                ArrayList<T> newElements = new ArrayList<>(capacity);
-                newElements.addAll(this);
                 readPos = 0;
                 writePos = size;
-                elements = newElements;
-                capacity *= 2;
+                capacity *= CAPACITY_EXPANSION;
                 for (int i = 0; i < capacity - size; i++) {
                     elements.add(null);
                 }
@@ -150,10 +156,10 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public boolean removeAll(Collection<?> c) {
-        for (T t : this) {
-            if (c.contains(t))
-                this.remove(c.remove(t));
-        }
+//        for (T t : this) {
+//            if (c.contains(t))
+//                this.remove(c.remove(t));
+//        }
         return true;
     }
 
@@ -173,16 +179,16 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public T remove() {
-        return removeRing();
+        return removeFromRing();
     }
 
     @Override
     public T poll() {
         if (this.isEmpty()) return null;
-        return removeRing();
+        return removeFromRing();
     }
 
-    private T removeRing() {
+    private T removeFromRing() {
         T t = elements.get(readPos);
         readPos = incrementPos(readPos);
         this.size--;
@@ -203,13 +209,16 @@ public class Ringpuffer<T> implements Queue<T>, Serializable, Cloneable {
 
     @Override
     public boolean retainAll(Collection<?> c) {
-        boolean changed = false;
-        for (Object o : c) {
-            if (!contains(o)) {
-                this.remove(o);
-                changed = true;
-            }
-        }
-        return changed;
+//        boolean changed = false;
+//        for (Object o : c) {
+//            if (!this.contains(o)) {
+//                this.remove(o);
+//                changed = true;
+//            }
+//        }
+//        return changed;
+        return false;
     }
+
+    //retainAll, remove(o), toArray, removeAll
 }

@@ -5,7 +5,7 @@ public class App {
     public static void main(String[] args) {
         truetrue();
         falsefalse();
-        truefalse();
+        truefalse(); //fixed true, discard false
     }
 
     public static void truetrue() {
@@ -20,6 +20,8 @@ public class App {
                 System.out.println(e);
             }
         }
+
+
         System.out.println("Ring in foreach (iterator):");
         ring.forEach(System.out::println);
 
@@ -50,6 +52,8 @@ public class App {
                 System.out.println(e);
             }
         }
+
+
         System.out.println("Ring in foreach (iterator):");
         ring.forEach(System.out::println);
 
